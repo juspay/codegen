@@ -31,10 +31,9 @@ gptapikey = ""
 
 typesRequest :: String -> IO (String)
 typesRequest prompt = do
-  expromt <- readFile "./testprompt"
   let url = baseURL ++ "openai/deployments/" ++ deploymentForTrans ++ deploymentType ++ "?api-version=" ++ apiVersion
       headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
-      promptMsg = typeSample ++ [Message "user" expromt]
+      promptMsg = typeSample ++ [Message "user" prompt]
   gptoutput <- requestGPT promptMsg url headers
   case gptoutput of
     Right codeInput -> pure codeInput
@@ -42,7 +41,6 @@ typesRequest prompt = do
 
 formatDocument :: DocData -> IO (FormatedDocData)
 formatDocument prompt = do
-  -- expromt <- readFile "./testprompt"
   let url = baseGPTUrl ++ "openai/deployments/" ++ deploymentForTypes ++ deploymentType ++ "?api-version=" ++ apiVersion
       headers = [("Content-Type", "application/json"), ("api-key", pack gptapikey)]
       promptMsg = [Message "user" ("Convert the following document data in csv format considering next line will be new field\n" <> (getField @"document_data" prompt))]
