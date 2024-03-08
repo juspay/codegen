@@ -266,17 +266,17 @@
         "references": "references"
       },
       "locked": {
-        "lastModified": 1708935579,
-        "narHash": "sha256-d15p9mFYxdqBLJFI97MtD2YP9NKRF8gjS5J9ZsNnJi4=",
+        "lastModified": 1709103348,
+        "narHash": "sha256-RdrRehBTlAjREgDrgxFmXiON5LCrxsewZBI7FnmcRvs=",
         "owner": "juspay",
         "repo": "haskell-tools",
-        "rev": "55b76d1cab1334e18be8a9e688e9f3e6af530d48",
+        "rev": "577263b05e10abcbc09d0d34dd316fc75e4dc380",
         "type": "github"
       },
       "original": {
         "owner": "juspay",
         "repo": "haskell-tools",
-        "rev": "55b76d1cab1334e18be8a9e688e9f3e6af530d48",
+        "rev": "577263b05e10abcbc09d0d34dd316fc75e4dc380",
         "type": "github"
       }
     },

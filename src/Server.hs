@@ -5,8 +5,8 @@ module Server where
 
 import Servant.Server
 import qualified Network.Wai.Handler.Warp
-import Servant.API ((:>), JSON, ReqBody, (:<|>), Post)
-import Servant (Proxy(..))
+import Servant.API ((:>), JSON, ReqBody, (:<|>), Post, PlainText)
+import Servant (Proxy(..),  (:<|>)(..))
 import Types
 import qualified Data.HashMap.Strict as HM
 import EnvVars
@@ -17,29 +17,36 @@ import Data.List.Extra (replace, stripSuffix, foldl)
 import Data.Maybe (fromMaybe)
 import Control.Monad (foldM)
 import CheckCodeAnalysis
+import OpenAPIIntreaction
+import Control.Monad.IO.Class
 
 type MyApi = "uploadDoc" :> ReqBody '[JSON] DocumentData :> Post '[JSON] DocumentSplitData
+            :<|> "gateway" :> ("integrate" :> ReqBody '[JSON] CodeInput :> Post '[JSON] CodeOutput
+                              :<|> "types" :> ReqBody '[PlainText] String :> Post '[PlainText] String)
+            :<|> "document" :> ("format" :> ReqBody '[JSON] DocData :> Post '[JSON] FormatedDocData)
 
-server :: Server MyApi
-server = postBook
-  where listAllBooks = undefined
-        postBook book = undefined
+server :: ((HM.HashMap String [String]), (HM.HashMap String [String])) -> Server MyApi
+server allTypes = splitDoc :<|> (genTransForms :<|> genTypes) :<|> (formatDoc)
+  where genTransForms codeInput = liftIO $ generateTransformFuns codeInput allTypes
+        formatDoc docData = liftIO $ formatDocument docData
+        genTypes docData = liftIO $ typesRequest docData
+        splitDoc book = undefined
 
 myApi :: Proxy MyApi
 myApi = Proxy
 
-app :: Application
-app val x = do
-    allTypes <- getAllTypesParsed
-
-    serve myApi server val x
+app :: ((HM.HashMap String [String]), (HM.HashMap String [String])) -> Application
+app allTypes val x = do
+    serve myApi (server allTypes) val x
 
 main :: IO ()
-main = Network.Wai.Handler.Warp.run 8080 app
+main = do
+    allTypes <- getAllTypesParsed
+    Network.Wai.Handler.Warp.run 3005 (app allTypes)
 
 filteredMods = ["Euler.DB.Mesh.UtilsTh"]
 
-getAllTypesParsed :: IO (HM.HashMap String [String])
+getAllTypesParsed :: IO ((HM.HashMap String [String]), (HM.HashMap String [String]))
 getAllTypesParsed = do
     repoPath <- dbTypesPath
     gateway <- gatewayPath
@@ -47,7 +54,7 @@ getAllTypesParsed = do
     let gatewayCond val = not $ isPrefixOf "Euler.API.Gateway.Domain" val || isPrefixOf "Euler.API.Gateway.Types" val
     gatewayTypes <- getTypes gateway gatewayCond
     dbTypes <- getTypes repoPath dbCond
-    pure $ gatewayTypes <> dbTypes
+    pure (gatewayTypes, dbTypes)
 
 getTypes :: String -> ([Char] -> Bool) -> IO (HM.HashMap String [String])
 getTypes repoPath cond = do
@@ -61,3 +68,5 @@ getTypes repoPath cond = do
            else pure acc) HM.empty allSubFiles
     pure y
 
+generateTransformFuns codeInput (gatewayTypes,dbTypes) = do
+    compareASTForFuns gatewayTypes dbTypes codeInput

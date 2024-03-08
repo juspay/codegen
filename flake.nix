@@ -8,7 +8,7 @@
     systems.url = "github:nix-systems/default";
     references.url = "github:eswar2001/references/35912f3cc72b67fa63a8d59d634401b79796469e";
     references.flake = true;
-    haskell-tools.url = "github:juspay/haskell-tools/55b76d1cab1334e18be8a9e688e9f3e6af530d48";
+    haskell-tools.url = "github:juspay/haskell-tools/577263b05e10abcbc09d0d34dd316fc75e4dc380";
   };
   outputs = inputs @ {
     self,

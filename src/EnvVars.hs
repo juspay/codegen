@@ -4,7 +4,7 @@ import System.Environment (lookupEnv)
 import Data.Maybe (fromMaybe)
 
 gatewayPath :: IO String
-gatewayPath = fromMaybe "" <$> lookupEnv "GATEWAY_REPO_PATH"
+gatewayPath = fromMaybe "/home/chaitanya/Desktop/work/euler-api-gateway/src" <$> lookupEnv "GATEWAY_REPO_PATH"
 
 dbTypesPath :: IO String
-dbTypesPath = fromMaybe "" <$> lookupEnv "DB_REPO_PATH"
+dbTypesPath = fromMaybe "/home/chaitanya/Desktop/work/euler-db/src" <$> lookupEnv "DB_REPO_PATH"
