@@ -85,3 +85,17 @@ data ErrorResponse = ErrorResponse
   }
   deriving (Generic, ToJSON, FromJSON, Show)
 instance Exception ErrorResponse
+
+data FlowInput = FlowInput
+  { inputType :: String
+  , accDetailsType :: String
+  , gatewayName :: String
+  , gatewayReqType :: String
+  , gatewayRespType :: String
+  }
+  deriving (Generic, ToJSON, FromJSON, Show)
+
+data FlowOutput = FlowOutput
+  { instances :: String
+  }
+  deriving (Generic, ToJSON, FromJSON, Show)

@@ -19,17 +19,20 @@ import Control.Monad (foldM)
 import CheckCodeAnalysis
 import OpenAPIIntreaction
 import Control.Monad.IO.Class
+import GenerateFlow
 
 type MyApi = "uploadDoc" :> ReqBody '[JSON] DocumentData :> Post '[JSON] DocumentSplitData
             :<|> "gateway" :> ("integrate" :> ReqBody '[JSON] CodeInput :> Post '[JSON] CodeOutput
-                              :<|> "types" :> ReqBody '[PlainText] String :> Post '[PlainText] String)
+                              :<|> "types" :> ReqBody '[JSON] DocData :> Post '[JSON] FormatedDocData
+                              :<|> "flows" :> ReqBody '[JSON] FlowInput :> Post '[JSON] FlowOutput)
             :<|> "document" :> ("format" :> ReqBody '[JSON] DocData :> Post '[JSON] FormatedDocData)
 
 server :: ((HM.HashMap String [String]), (HM.HashMap String [String])) -> Server MyApi
-server allTypes = splitDoc :<|> (genTransForms :<|> genTypes) :<|> (formatDoc)
+server allTypes = splitDoc :<|> (genTransForms :<|> genTypes :<|> genFlow) :<|> (formatDoc)
   where genTransForms codeInput = liftIO $ generateTransformFuns codeInput allTypes
         formatDoc docData = liftIO $ formatDocument docData
         genTypes docData = liftIO $ typesRequest docData
+        genFlow docData = pure $ generateInstances docData
         splitDoc book = undefined
 
 myApi :: Proxy MyApi
@@ -42,6 +45,7 @@ app allTypes val x = do
 main :: IO ()
 main = do
     allTypes <- getAllTypesParsed
+    print "Starting Server..."
     Network.Wai.Handler.Warp.run 3005 (app allTypes)
 
 filteredMods = ["Euler.DB.Mesh.UtilsTh"]

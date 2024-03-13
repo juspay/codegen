@@ -19,7 +19,6 @@ import OpenAPIIntreaction
 import Control.Exception
 import GHC.Records (getField)
 
-requestTypeEnv = pure "initiaterefund"
 accDetails = HM.fromList [] -- [("accountdetails",["onepayMerchantId","onepayMerchantName","onepayApiKey"])]
 
 fewMappings =
@@ -32,12 +31,12 @@ compareASTForFuns allFields dbFields codeInput = do
     !changedInput <- transformsRequest prompt (concat $ inputs codeInput)
     -- let allSubFiles = Unused.getAllSubFils "/home/chaitanya/Desktop/work/euler-api-gateway/src"  []
     case changedInput of
-        Right codeInput -> do
+        Right genCode -> do
             emoduleAST <- try $ moduleParser "/home/chaitanya/Desktop/work/codegen/" "Response"
             case emoduleAST of
               Right moduleAST -> do
                 allFuns <- Fl.getModFunctionList moduleAST "Sample"
-                requestType <- requestTypeEnv
+                let requestType = (inputs codeInput) !! 0
                 let pats = mapMaybe getAllDot (moduleAST ^? biplateRef)
                     allDotOps = nub $ (snd <$> pats) ++ (fst <$> pats)
                 print allDotOps
@@ -65,9 +64,9 @@ compareASTForFuns allFields dbFields codeInput = do
                                                                                 else foldl (\acc (typeName,fields) -> if y `elem` fields then acc ++ [typeName] else acc) [] getFilteredFromAllDBFields
                                                         in ((x ++ "." ++ y),expectedFields)) allNotRelatedFields
                 writeFile "AllFuns" (show pats)
-                pure $ CodeOutput codeInput halucinatedFuns halucinatedFunScore halucinatedTypeScore mapAllRelatedFields
+                pure $ CodeOutput genCode halucinatedFuns halucinatedFunScore halucinatedTypeScore mapAllRelatedFields
               Left (e :: SomeException) ->
-                pure $ CodeOutput ("Couldnt parse the below code, so metrics are not generated\n" <> codeInput) [] 0.0 0.0 HM.empty
+                pure $ CodeOutput ("Couldnt parse the below code, so metrics are not generated\n" <> genCode) [] 0.0 0.0 HM.empty
         Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
 
 getAllDot :: Ann UExpr (Dom GhcPs) SrcTemplateStage -> Maybe (String,String)

@@ -29,14 +29,14 @@ deploymentType = ""
 apiKey = ""
 gptapikey = ""
 
-typesRequest :: String -> IO (String)
+typesRequest :: DocData -> IO (FormatedDocData)
 typesRequest prompt = do
   let url = baseURL ++ "openai/deployments/" ++ deploymentForTrans ++ deploymentType ++ "?api-version=" ++ apiVersion
       headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
-      promptMsg = typeSample ++ [Message "user" prompt]
+      promptMsg = typeSample ++ [Message "user" (getField @"document_data" prompt)]
   gptoutput <- requestGPT promptMsg url headers
   case gptoutput of
-    Right codeInput -> pure codeInput
+    Right codeInput -> pure $ FormatedDocData codeInput
     Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
 
 formatDocument :: DocData -> IO (FormatedDocData)
