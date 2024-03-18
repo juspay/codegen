@@ -32,7 +32,9 @@ server allTypes = splitDoc :<|> (genTransForms :<|> genTypes :<|> genFlow) :<|> 
   where genTransForms codeInput = liftIO $ generateTransformFuns codeInput allTypes
         formatDoc docData = liftIO $ formatDocument docData
         genTypes docData = liftIO $ typesRequest docData
-        genFlow docData = pure $ generateInstances docData
+        genFlow docData = do
+            liftIO $ print docData
+            pure $ generateInstances docData
         splitDoc book = undefined
 
 myApi :: Proxy MyApi
@@ -73,4 +75,5 @@ getTypes repoPath cond = do
     pure y
 
 generateTransformFuns codeInput (gatewayTypes,dbTypes) = do
+    print codeInput
     compareASTForFuns gatewayTypes dbTypes codeInput

@@ -87,7 +87,7 @@ data ErrorResponse = ErrorResponse
 instance Exception ErrorResponse
 
 data FlowInput = FlowInput
-  { inputType :: String
+  { inputType :: [String]
   , accDetailsType :: String
   , gatewayName :: String
   , gatewayReqType :: String
