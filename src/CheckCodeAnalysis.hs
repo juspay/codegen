@@ -19,6 +19,8 @@ import OpenAPIIntreaction
 import Control.Exception
 import GHC.Records (getField)
 
+import System.Environment
+
 accDetails = HM.fromList [] -- [("accountdetails",["onepayMerchantId","onepayMerchantName","onepayApiKey"])]
 
 fewMappings =
@@ -29,10 +31,11 @@ compareASTForFuns allFields dbFields codeInput = do
     let prompt = generatePrompt (getField @"document_data" codeInput) (module_name codeInput) (concat $ inputs codeInput) (output codeInput)
     writeFile "testprompt" prompt
     !changedInput <- transformsRequest prompt (concat $ inputs codeInput)
-    -- let allSubFiles = Unused.getAllSubFils "/home/chaitanya/Desktop/work/euler-api-gateway/src"  []
+    -- let allSubFiles = Unused.getAllSubFils ""  []
     case changedInput of
         Right genCode -> do
-            emoduleAST <- try $ moduleParser "/home/chaitanya/Desktop/work/codegen/" "Response"
+            codegenDir <- getEnv "CODEGEN_DIR"
+            emoduleAST <- try $ moduleParser codegenDir "Response"
             case emoduleAST of
               Right moduleAST -> do
                 allFuns <- Fl.getModFunctionList moduleAST "Sample"
@@ -43,8 +46,9 @@ compareASTForFuns allFields dbFields codeInput = do
                 let filteredFuns = nub $ map (\(x,list) -> (x, filter (\(_,name) -> not $ name `elem` allDotOps ) list)) (allFuns :: [(String,[(String,String)])])
                     allFunsInvolved = nub $ filter (\(x,y) -> not $ x == "") (concat $ snd <$> allFuns)
                     getAllLocalFuns = nub $ filter (\(x,y) -> "Euler.API.Gateway" `isInfixOf` x) (concat $ snd <$> allFuns)
+                srcDir <- getEnv "SRC_DIR"
                 filesToParseAST <- mapM (\x -> do
-                                    emod <- try $ moduleParser "/home/chaitanya/Desktop/work/euler-api-gateway/src" x
+                                    emod <- try $ moduleParser srcDir x
                                     case emod of
                                         Right mod -> pure (Just mod,x)
                                         Left (e :: SomeException) -> pure (Nothing,x)) $ nub $ fst <$> getAllLocalFuns

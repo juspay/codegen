@@ -18,8 +18,6 @@ generatePrompt docData modName inputs outputs =
   "Generate a Haskell code to transform data into the API request body using the provided information. Utilize Haskell types if mentioned below. If no request body is specified, skip generating the transformation function. Do not create Haskell data types for request and response bodies; assume they already exist.\nDESCRIPTION:" ++ docData ++ (maybe "\n" (\x -> "\nMODULE_NAME:" ++ x) modName) ++ "\nINPUT TYPE:" ++ inputs ++ "\nOUTPUT TYPE:" ++ outputs
 
 
--- https://genius-gpt-4.openai.azure.com/openai/deployments/genius-gpt-4-turbo/chat/completions?api-version=2024-02-15-preview
--- https://gateway-integration-ai.openai.azure.com/openai/deployments/v6-gateway/chat/completions?api-version=2024-02-15-preview"
 baseURL = ""
 baseGPTUrl = ""
 deploymentForTrans = ""
@@ -84,7 +82,7 @@ requestGPT promptMsg url headers = do
       then case eitherDecode $ responseBody response of
             Left err -> return $ Left $ (400,"OPEN_API_DECODE_ERROR")
             Right res -> do
-              let resContents = (unlines $ map (\x -> 
+              let resContents = (unlines $ map (\x ->
                     if "module " `isPrefixOf` x then "module Response where" else x
                     ) $ lines $ (getField @"content") $ ((message $ head $ choices (res :: ResponseBody)) :: MessageContent))
               writeFile "Response.hs" resContents
