@@ -18,15 +18,27 @@ import Types
 import OpenAPIIntreaction
 import Control.Exception
 import GHC.Records (getField)
-
+import Language.Haskell.Tools.Refactor as HT
+import qualified Language.Haskell.Tools.AST as AST
+import Language.Haskell.Tools.PrettyPrint
+import System.Directory
+import System.IO.Unsafe
 import System.Environment
+import Data.List.Extra (replace)
 
 accDetails = HM.fromList [] -- [("accountdetails",["onepayMerchantId","onepayMerchantName","onepayApiKey"])]
 
 fewMappings =
     [""]
 
-compareASTForFuns :: (HM.HashMap String [String]) -> (HM.HashMap String [String]) -> CodeInput -> IO CodeOutput
+getModuleName :: Ann UModuleName (Dom GhcPs) SrcTemplateStage -> Maybe String
+getModuleName (Ann _ (UModuleName ex)) = Just ex
+
+checkIfModPresent :: String  -> Ann UImportDecl (Dom GhcPs) SrcTemplateStage -> Bool
+checkIfModPresent srcDir expr@(Ann _ (UImportDecl _ _ _ _ modName qualifiedName specs)) =
+    not ("Euler.API.Gateway" `isInfixOf` (fromMaybe "" $ getModuleName modName)) || (unsafePerformIO $ doesFileExist (srcDir <> (replace "." "/" $ fromMaybe "" $ getModuleName modName) <> ".hs"))
+
+compareASTForFuns :: (HM.HashMap String (String,[String])) -> (HM.HashMap String (String,[String])) -> CodeInput -> IO CodeOutput
 compareASTForFuns allFields dbFields codeInput = do
     let prompt = generatePrompt (getField @"document_data" codeInput) (module_name codeInput) (concat $ inputs codeInput) (output codeInput)
     writeFile "testprompt" prompt
@@ -38,7 +50,7 @@ compareASTForFuns allFields dbFields codeInput = do
             emoduleAST <- try $ moduleParser codegenDir "Response"
             case emoduleAST of
               Right moduleAST -> do
-                allFuns <- Fl.getModFunctionList moduleAST "Sample"
+                allFuns <- Fl.getModFunctionList moduleAST "Response"
                 let requestType = (inputs codeInput) !! 0
                 let pats = mapMaybe getAllDot (moduleAST ^? biplateRef)
                     allDotOps = nub $ (snd <$> pats) ++ (fst <$> pats)
@@ -53,22 +65,27 @@ compareASTForFuns allFields dbFields codeInput = do
                                         Right mod -> pure (Just mod,x)
                                         Left (e :: SomeException) -> pure (Nothing,x)) $ nub $ fst <$> getAllLocalFuns
                 allLocalFunList <- mapM (\(maybeMod,x) -> maybe (pure []) (\mod -> Fl.getModFunctionList mod x) maybeMod) filesToParseAST
+                let impsFil = filter (checkIfModPresent srcDir) (moduleAST ^? modImports & annList :: [HT.ImportDecl'])
+                (AST.AnnListG annot currentDecl) <- moduleAST ^? (modDecl)
+                let modifiedAST = (.=) modImports (AST.AnnListG annot impsFil) moduleAST
                 let onlyFuns = (((fst <$> (concat allLocalFunList))))
                     totalFuns = length allFunsInvolved
                     halucinatedFuns = filter (\x -> not $ x `elem` onlyFuns) (nub $ snd <$> getAllLocalFuns)
                     halucinatedFunScore = ((int2Float $ length halucinatedFuns) / int2Float totalFuns ) * 100
-                    allNotRelatedFields = filter (\(x,y) -> not $ case HM.lookup ( if x == "request" then requestType else toLower <$> x) (allFields <> accDetails) of
-                                                            Just val -> y `elem` val
+                    allDataTypes = (dbFields <> allFields <> accDetails)
+                    allNotRelatedFields = filter (\(x,y) -> not $ case HM.lookup ( if x == "request" then (toLower <$> requestType) else toLower <$> x) (allDataTypes) of
+                                                            Just val -> y `elem` (snd val)
                                                             Nothing -> False) pats
-                let halucinatedTypeScore = ((int2Float $ length allNotRelatedFields) / int2Float (length pats) ) * 100
-                let toBeFound = snd <$> allNotRelatedFields
-                    getFilteredFromAllFields = filter (\(x,y) -> any (\val -> val `elem` y) toBeFound ) $ HM.toList allFields
-                    getFilteredFromAllDBFields = filter (\(x,y) -> any (\val -> val `elem` y) toBeFound ) $ HM.toList dbFields
-                    mapAllRelatedFields = HM.fromList $ map (\(x,y) -> let expectedFields = if x == "request" then foldl (\acc (typeName,fields) -> if y `elem` fields then acc ++ [typeName] else acc) [] getFilteredFromAllFields
-                                                                                else foldl (\acc (typeName,fields) -> if y `elem` fields then acc ++ [typeName] else acc) [] getFilteredFromAllDBFields
+                    halucinatedTypeScore = ((int2Float $ length allNotRelatedFields) / int2Float (length pats) ) * 100
+                    toBeFound = snd <$> allNotRelatedFields
+                    getFilteredFromAllDBFields = filter (\(x,(_,y)) -> any (\val -> val `elem` y) toBeFound ) $ HM.toList dbFields
+                    requestTypeFields = snd $ fromMaybe ("",[]) $ HM.lookup (toLower <$> requestType) allFields
+                    mapAllRelatedFields = HM.fromList $ map (\(x,y) -> let expectedFields = if x == "request" then []
+                                                                                else foldl (\acc (typeName,(_,fields)) -> if y `elem` fields && typeName `elem` ( map (\x -> toLower <$> x) $ requestTypeFields) then
+                                                                                        let orgTypeName = filter (\x -> (toLower <$> x) == typeName) requestTypeFields
+                                                                                        in acc ++ orgTypeName else acc) [] getFilteredFromAllDBFields
                                                         in ((x ++ "." ++ y),expectedFields)) allNotRelatedFields
-                writeFile "AllFuns" (show pats)
-                pure $ CodeOutput genCode halucinatedFuns halucinatedFunScore halucinatedTypeScore mapAllRelatedFields
+                pure $ CodeOutput (prettyPrint modifiedAST) halucinatedFuns halucinatedFunScore halucinatedTypeScore mapAllRelatedFields
               Left (e :: SomeException) ->
                 pure $ CodeOutput ("Couldnt parse the below code, so metrics are not generated\n" <> genCode) [] 0.0 0.0 HM.empty
         Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage

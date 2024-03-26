@@ -27,7 +27,7 @@ type MyApi = "uploadDoc" :> ReqBody '[JSON] DocumentData :> Post '[JSON] Documen
                               :<|> "flows" :> ReqBody '[JSON] FlowInput :> Post '[JSON] FlowOutput)
             :<|> "document" :> ("format" :> ReqBody '[JSON] DocData :> Post '[JSON] FormatedDocData)
 
-server :: ((HM.HashMap String [String]), (HM.HashMap String [String])) -> Server MyApi
+server :: ((HM.HashMap String (String,[String])), (HM.HashMap String (String,[String]))) -> Server MyApi
 server allTypes = splitDoc :<|> (genTransForms :<|> genTypes :<|> genFlow) :<|> (formatDoc)
   where genTransForms codeInput = liftIO $ generateTransformFuns codeInput allTypes
         formatDoc docData = liftIO $ formatDocument docData
@@ -40,7 +40,7 @@ server allTypes = splitDoc :<|> (genTransForms :<|> genTypes :<|> genFlow) :<|> 
 myApi :: Proxy MyApi
 myApi = Proxy
 
-app :: ((HM.HashMap String [String]), (HM.HashMap String [String])) -> Application
+app :: ((HM.HashMap String (String,[String])), (HM.HashMap String (String,[String]))) -> Application
 app allTypes val x = do
     serve myApi (server allTypes) val x
 
@@ -52,7 +52,7 @@ main = do
 
 filteredMods = ["Euler.DB.Mesh.UtilsTh"]
 
-getAllTypesParsed :: IO ((HM.HashMap String [String]), (HM.HashMap String [String]))
+getAllTypesParsed :: IO ((HM.HashMap String (String,[String])), (HM.HashMap String (String,[String])))
 getAllTypesParsed = do
     repoPath <- dbTypesPath
     gateway <- gatewayPath
@@ -62,7 +62,7 @@ getAllTypesParsed = do
     dbTypes <- getTypes repoPath dbCond
     pure (gatewayTypes, dbTypes)
 
-getTypes :: String -> ([Char] -> Bool) -> IO (HM.HashMap String [String])
+getTypes :: String -> ([Char] -> Bool) -> IO (HM.HashMap String (String,[String]))
 getTypes repoPath cond = do
     let allSubFiles = Unused.getAllSubFils repoPath []
     y <- foldM (\acc t -> do
