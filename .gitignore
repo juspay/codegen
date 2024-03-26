@@ -19,3 +19,6 @@ stackage-test-logs
 *.todo
 *.notes
 Gateway/*
+
+src/Examples.hs
+src/GenerateFlow.hs
