@@ -99,3 +99,47 @@ data FlowOutput = FlowOutput
   { instances :: String
   }
   deriving (Generic, ToJSON, FromJSON, Show)
+
+
+data CreateDeploymentRequest = CreateDeploymentRequest {
+  modelName :: String,
+  version :: String
+} deriving (Generic, FromJSON, Show)
+
+data CreateDeploymentRes = CreateOrDeleteDeploymentSuccess |  CreateDeploymentFailure {
+    errorMessage :: String,
+    errorCode :: Int
+} deriving (Generic, ToJSON, Show)
+
+-- TODO: Add ToJSON instnace for createDeploymentRes
+
+
+--- Azure types
+
+data OaiDeployModelSKU = OaiDeployModelSKU {
+  name :: String,
+  capacity :: Int 
+} deriving (Generic, ToJSON, Show)
+
+
+data OaiDeployModelProperties = OaiDeployModelProperties {
+   format :: String,
+   name :: String ,
+   version :: String 
+} deriving (Generic, ToJSON, Show)
+
+newtype OaiDeployProperties = OaiDeployProperties {
+  model :: OaiDeployModelProperties
+} deriving (Generic, ToJSON, Show)
+
+data OaiCreateDeploymentRequest = OaiCreateDeploymentRequest {
+    sku :: OaiDeployModelSKU,
+    properties :: OaiDeployProperties
+} deriving (Generic, ToJSON, Show)
+
+
+data AzureLoginResponse = AzureLoginResponse {
+  token_type :: String,
+  expires_in :: Int ,
+  access_token :: String 
+} deriving (Generic, ToJSON, FromJSON, Show)
