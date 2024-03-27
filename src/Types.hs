@@ -95,6 +95,20 @@ data FlowInput = FlowInput
   }
   deriving (Generic, ToJSON, FromJSON, Show)
 
+data RoutesInput = RoutesInput
+  {
+    documentData :: String
+  , gatewayReqType :: String
+  , gatewayRespType :: String
+  }
+  deriving (Generic, ToJSON, FromJSON, Show)
+
+data RoutesOutput = RoutesOutput
+  {
+    routes :: String
+  }
+  deriving (Generic, ToJSON, FromJSON, Show)
+
 data FlowOutput = FlowOutput
   { instances :: String
   }

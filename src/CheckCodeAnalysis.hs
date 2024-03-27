@@ -15,7 +15,7 @@ import Data.Char (isAlphaNum, toLower)
 import Control.Reference
 import qualified Language.Haskell.Tools.Parser.RemoveUnusedFuns as Unused
 import Types
-import OpenAPIIntreaction
+import OpenAIIntraction
 import Control.Exception
 import GHC.Records (getField)
 import Language.Haskell.Tools.Refactor as HT
@@ -38,12 +38,8 @@ checkIfModPresent :: String  -> Ann UImportDecl (Dom GhcPs) SrcTemplateStage -> 
 checkIfModPresent srcDir expr@(Ann _ (UImportDecl _ _ _ _ modName qualifiedName specs)) =
     not ("Euler.API.Gateway" `isInfixOf` (fromMaybe "" $ getModuleName modName)) || (unsafePerformIO $ doesFileExist (srcDir <> (replace "." "/" $ fromMaybe "" $ getModuleName modName) <> ".hs"))
 
-compareASTForFuns :: (HM.HashMap String (String,[String])) -> (HM.HashMap String (String,[String])) -> CodeInput -> IO CodeOutput
-compareASTForFuns allFields dbFields codeInput = do
-    let prompt = generatePrompt (getField @"document_data" codeInput) (module_name codeInput) (concat $ inputs codeInput) (output codeInput)
-    writeFile "testprompt" prompt
-    !changedInput <- transformsRequest prompt (concat $ inputs codeInput)
-    -- let allSubFiles = Unused.getAllSubFils ""  []
+compareASTForFuns :: (Either (Int,String) String) -> (HM.HashMap String (String,[String])) -> (HM.HashMap String (String,[String])) -> CodeInput -> IO CodeOutput
+compareASTForFuns changedInput allFields dbFields codeInput = do
     case changedInput of
         Right genCode -> do
             codegenDir <- getEnv "CODEGEN_DIR"

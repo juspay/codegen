@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 
 module Server where
@@ -17,15 +18,18 @@ import Data.List.Extra (replace, stripSuffix, foldl)
 import Data.Maybe (fromMaybe)
 import Control.Monad (foldM)
 import CheckCodeAnalysis
-import OpenAPIIntreaction
+import OpenAIIntraction
 import Control.Monad.IO.Class
 import GenerateFlow
 import Azure (createDeployment, deleteDeployment)
 
+import Config (temperatureRanges)
+import GHC.Records (getField)
 
 type MyApi = "uploadDoc" :> ReqBody '[JSON] DocumentData :> Post '[JSON] DocumentSplitData
             :<|> "gateway" :> ("integrate" :> ReqBody '[JSON] CodeInput :> Post '[JSON] CodeOutput
                               :<|> "types" :> ReqBody '[JSON] DocData :> Post '[JSON] FormatedDocData
+                              :<|> "routes" :> ReqBody '[JSON] RoutesInput :> Post '[JSON] RoutesOutput
                               :<|> "flows" :> ReqBody '[JSON] FlowInput :> Post '[JSON] FlowOutput)
             :<|> "document" :> ("format" :> ReqBody '[JSON] DocData :> Post '[JSON] FormatedDocData)
             :<|> "deployment" :> ("create" :> ReqBody '[JSON] CreateDeploymentRequest  :> Post '[JSON] CreateDeploymentRes
@@ -33,10 +37,11 @@ type MyApi = "uploadDoc" :> ReqBody '[JSON] DocumentData :> Post '[JSON] Documen
 
 
 server :: ((HM.HashMap String (String,[String])), (HM.HashMap String (String,[String]))) -> Server MyApi
-server allTypes = splitDoc :<|> (genTransForms :<|> genTypes :<|> genFlow) :<|> (formatDoc) :<|> (createDep :<|> deleteDep)
+server allTypes = splitDoc :<|> (genTransForms :<|> genTypes :<|> genRoutes :<|> genFlow) :<|> (formatDoc) :<|> (createDep :<|> deleteDep)
   where genTransForms codeInput = liftIO $ generateTransformFuns codeInput allTypes
         formatDoc docData = liftIO $ formatDocument docData
         genTypes docData = liftIO $ typesRequest docData
+        genRoutes input = liftIO $ routesRequest input
         genFlow docData = do
             liftIO $ print docData
             pure $ generateInstances docData
@@ -84,4 +89,7 @@ getTypes repoPath cond = do
 
 generateTransformFuns codeInput (gatewayTypes,dbTypes) = do
     print codeInput
-    compareASTForFuns gatewayTypes dbTypes codeInput
+    let prompt = generatePrompt (getField @"document_data" codeInput) (module_name codeInput) (concat $ inputs codeInput) (output codeInput)
+    changedInput <- mapM (\temp -> transformsRequest temp prompt (concat $ inputs codeInput)) (temperatureRanges)
+    allOutputs <- mapM (\input -> compareASTForFuns input gatewayTypes dbTypes codeInput) changedInput
+    pure $ head $ sortOn (\codeOutput -> hallucinations_functions_score codeOutput + hallucinations_types_score codeOutput) allOutputs
