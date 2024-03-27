@@ -32,8 +32,8 @@ reaskHallucinatedFuncsPrompt halucinatedFuns =
 data FuncReaskInput = FuncReaskInput{
     retryCount :: Int,
     convHistory :: [Message],
-    allFields :: HM.HashMap String [String], 
-    dbFields :: HM.HashMap String [String],
+    allFields :: (HM.HashMap String (String,[String])), 
+    dbFields :: (HM.HashMap String (String,[String])),
     codeInput :: CodeInput
 }
 
@@ -59,7 +59,7 @@ funcReaskPipeline fri@FuncReaskInput{..} = do
 
 
 
-generateTransformFunctions :: HM.HashMap String [String] -> HM.HashMap String [String] -> CodeInput -> IO CodeOutput
+generateTransformFunctions :: (HM.HashMap String (String,[String])) -> (HM.HashMap String (String,[String])) -> CodeInput -> IO CodeOutput
 generateTransformFunctions allFields dbFields codeInput = do
     let prompt = generateTransformFuncPrompt (getField @"document_data" codeInput) (module_name codeInput) (concat $ inputs codeInput) (output codeInput)
     writeFile "testprompt" prompt

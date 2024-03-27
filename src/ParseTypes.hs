@@ -9,15 +9,15 @@ import Data.Maybe
 import Control.Reference
 import Language.Haskell.Tools.Parser.ParseModule (moduleParser)
 
-parseAndGetTypes :: String -> String -> IO (HM.HashMap String [String])
+parseAndGetTypes :: String -> String -> IO (HM.HashMap String (String,[String]))
 parseAndGetTypes modPath modName = do
     moduleAST <- moduleParser modPath modName
     pure $ HM.fromList $ mapMaybe getTypeData (moduleAST ^? biplateRef)
 
-getTypeData :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> Maybe (String,[String])
+getTypeData :: Ann UDecl (Dom GhcPs) SrcTemplateStage -> Maybe (String,(String,[String]))
 getTypeData expr@(Ann _ (UDataDecl _ _ declHead (AnnListG _ records) _)) = do
     let allFieldNames = concat $ mapMaybe getFieldName records
-    (\x -> Just (toLower <$> x,allFieldNames)) =<< (SM.getNameFromDeclHead declHead)
+    (\x -> Just (toLower <$> x,(x,allFieldNames))) =<< (SM.getNameFromDeclHead declHead)
 getTypeData _ = Nothing
 
 getFieldName :: Ann UConDecl (Dom GhcPs) SrcTemplateStage -> Maybe [String]
