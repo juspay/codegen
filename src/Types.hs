@@ -108,7 +108,7 @@ data CreateDeploymentRequest = CreateDeploymentRequest {
 
 data CreateDeploymentRes = CreateDeploymentSuccess |  CreateDeploymentFailure {
     errorMessage :: String,
-    errorCode :: String
+    errorCode :: Int
 } deriving (Generic, ToJSON, Show)
 
 -- TODO: Add ToJSON instnace for createDeploymentRes
@@ -118,7 +118,7 @@ data CreateDeploymentRes = CreateDeploymentSuccess |  CreateDeploymentFailure {
 
 data OaiDeployModelSKU = OaiDeployModelSKU {
   name :: String,
-  capacity :: String
+  capacity :: Int 
 } deriving (Generic, ToJSON, Show)
 
 
@@ -134,5 +134,12 @@ newtype OaiDeployProperties = OaiDeployProperties {
 
 data OaiCreateDeploymentRequest = OaiCreateDeploymentRequest {
     sku :: OaiDeployModelSKU,
-    properties :: OaiDeployModelProperties
+    properties :: OaiDeployProperties
 } deriving (Generic, ToJSON, Show)
+
+
+data AzureLoginResponse = AzureLoginResponse {
+  token_type :: String,
+  expires_in :: String ,
+  access_token :: String 
+} deriving (Generic, ToJSON, FromJSON, Show)

@@ -20,7 +20,7 @@ import CheckCodeAnalysis
 import OpenAPIIntreaction
 import Control.Monad.IO.Class
 import GenerateFlow
-import Azure (createDeployment)
+import Azure (createDeployment, deleteDeployment)
 
 
 type MyApi = "uploadDoc" :> ReqBody '[JSON] DocumentData :> Post '[JSON] DocumentSplitData
@@ -28,10 +28,12 @@ type MyApi = "uploadDoc" :> ReqBody '[JSON] DocumentData :> Post '[JSON] Documen
                               :<|> "types" :> ReqBody '[JSON] DocData :> Post '[JSON] FormatedDocData
                               :<|> "flows" :> ReqBody '[JSON] FlowInput :> Post '[JSON] FlowOutput)
             :<|> "document" :> ("format" :> ReqBody '[JSON] DocData :> Post '[JSON] FormatedDocData)
-            :<|> "deployment" :> ("create" :> ReqBody '[JSON] CreateDeploymentRequest  :> Post '[JSON] CreateDeploymentRes)
+            :<|> "deployment" :> ("create" :> ReqBody '[JSON] CreateDeploymentRequest  :> Post '[JSON] CreateDeploymentRes
+                                   :<|> "delete" :> ReqBody '[JSON] CreateDeploymentRequest  :> Post '[JSON] CreateDeploymentRes)
+
 
 server :: ((HM.HashMap String [String]), (HM.HashMap String [String])) -> Server MyApi
-server allTypes = splitDoc :<|> (genTransForms :<|> genTypes :<|> genFlow) :<|> (formatDoc) :<|> (createDep)
+server allTypes = splitDoc :<|> (genTransForms :<|> genTypes :<|> genFlow) :<|> (formatDoc) :<|> (createDep :<|> deleteDep)
   where genTransForms codeInput = liftIO $ generateTransformFuns codeInput allTypes
         formatDoc docData = liftIO $ formatDocument docData
         genTypes docData = liftIO $ typesRequest docData
@@ -40,6 +42,8 @@ server allTypes = splitDoc :<|> (genTransForms :<|> genTypes :<|> genFlow) :<|> 
             pure $ generateInstances docData
         splitDoc book = undefined
         createDep req = liftIO $ createDeployment req
+        deleteDep req = liftIO $ deleteDeployment req
+
 
 myApi :: Proxy MyApi
 myApi = Proxy
