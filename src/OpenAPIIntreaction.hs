@@ -3,6 +3,7 @@
 module OpenAPIIntreaction where
 
 import Network.HTTP.Client
+import Network.HTTP.Client (Manager(..))
 import GHC.Records (getField)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Data.Aeson
@@ -12,7 +13,8 @@ import GHC.Generics (Generic)
 import Control.Exception (catch, throwIO)
 import Network.HTTP.Types.Status (statusCode,statusMessage , ok200)
 import Examples
-import Types
+import Types 
+import EnvVars (oaiReqTimeoutSecs)
 
 generatePrompt docData modName inputs outputs =
   "Generate a Haskell code to transform data into the API request body using the provided information. Utilize Haskell types if mentioned below. If no request body is specified, skip generating the transformation function. Do not create Haskell data types for request and response bodies; assume they already exist.\nDESCRIPTION:" ++ docData ++ (maybe "\n" (\x -> "\nMODULE_NAME:" ++ x) modName) ++ "\nINPUT TYPE:" ++ inputs ++ "\nOUTPUT TYPE:" ++ outputs
@@ -54,9 +56,13 @@ transformsRequest prompt inputType = do
         headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
     requestGPT promptMsg url headers
 
+getTimeoutInMicroSec :: String  -> Int 
+getTimeoutInMicroSec timeInSec = read timeInSec  * 1000000
+
 -- requestGPT :: [Message] -> IO (Either (Int,String) String)
 requestGPT promptMsg url headers = do
     manager <- newManager tlsManagerSettings
+    timeoutSecs <- oaiReqTimeoutSecs
     writeFile "promptmsg" (show promptMsg)
     let request_body = LLMRequestBody
           { messages = promptMsg
@@ -73,6 +79,7 @@ requestGPT promptMsg url headers = do
           { method = "POST"
           , requestBody = RequestBodyLBS $ encode request_body
           , requestHeaders = headers
+          , responseTimeout = responseTimeoutMicro $ getTimeoutInMicroSec timeoutSecs
           }
 
     response <- httpLbs request manager
