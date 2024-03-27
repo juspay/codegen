@@ -106,7 +106,7 @@ data CreateDeploymentRequest = CreateDeploymentRequest {
   version :: String
 } deriving (Generic, FromJSON, Show)
 
-data CreateDeploymentRes = CreateDeploymentSuccess |  CreateDeploymentFailure {
+data CreateDeploymentRes = CreateOrDeleteDeploymentSuccess |  CreateDeploymentFailure {
     errorMessage :: String,
     errorCode :: Int
 } deriving (Generic, ToJSON, Show)
@@ -140,6 +140,6 @@ data OaiCreateDeploymentRequest = OaiCreateDeploymentRequest {
 
 data AzureLoginResponse = AzureLoginResponse {
   token_type :: String,
-  expires_in :: String ,
+  expires_in :: Int ,
   access_token :: String 
 } deriving (Generic, ToJSON, FromJSON, Show)

@@ -8,7 +8,7 @@ import EnvVars
 import Network.HTTP.Client 
 import Data.ByteString.Char8 (ByteString, pack)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
-import Network.HTTP.Types ( Status(statusCode, statusMessage), ok200, HeaderName, Method )
+import Network.HTTP.Types ( Status(statusCode, statusMessage), ok200, HeaderName, Method, created201 )
 import Data.Aeson
 import Types (AzureLoginResponse(access_token), CreateDeploymentRequest (modelName, version), OaiCreateDeploymentRequest (sku))
 
@@ -52,9 +52,10 @@ getAzureAuthToken = do
     response <- httpLbs request manager
 
     let statusCode' = responseStatus response
+    
     if statusCode' == ok200
       then case eitherDecode $ responseBody response of
-            Left err -> return $ Left (400, "AZURE_LOGIN_ERROR")
+            Left err -> return $ Left (400, "AZURE_LOGIN_ERROR" ++ err)
             Right res -> do
               return $ Right $ access_token ( res :: AzureLoginResponse)
       else return $ Left (statusCode statusCode',show $ statusMessage statusCode')
@@ -93,8 +94,9 @@ modifyDeployment reqMethod req = do
             response <- httpLbs request manager
 
             let statusCode' = responseStatus response
-            if statusCode' == ok200
-            then return CreateDeploymentSuccess 
+            
+            if statusCode' == created201
+            then return CreateOrDeleteDeploymentSuccess 
             else return $ CreateDeploymentFailure "CREATE_DEPLOYMENT_ERROR" 500
 
 
