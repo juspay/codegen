@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, DataKinds #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 
 
 module CodeGen where
@@ -12,6 +13,8 @@ import qualified Data.HashMap.Strict as HM
 import Types
 import OpenAPIIntreaction
 import CheckCodeAnalysis
+import Examples (ragMessages)
+import Data.List (intercalate)
 
 
 generateTransformFuncPrompt docData modName inputs outputs =
@@ -21,14 +24,23 @@ generateTransformFuncPrompt docData modName inputs outputs =
   ++ "\nDESCRIPTION:" ++ docData ++ (maybe "\n" (\x -> "\nMODULE_NAME:" ++ x) modName)
   ++ "\nINPUT TYPE:" ++ inputs ++ "\nOUTPUT TYPE:" ++ outputs
 
+reaskHallucinatedFuncsPrompt halucinatedFuns = 
+    "Following imported functions are not available in codebase: " ++ halucinatedFuns
+    ++ "\n Can you generate function with it's functionality and add it to previously generated code?"
 
 
+data FuncReaskInput = FuncReaskInput{
+    retryCount :: Int,
+    convHistory :: [Message],
+    allFields :: HM.HashMap String [String], 
+    dbFields :: HM.HashMap String [String],
+    codeInput :: CodeInput
+}
 
-generateTransformFunctions :: (HM.HashMap String [String]) -> (HM.HashMap String [String]) -> CodeInput -> IO CodeOutput
-generateTransformFunctions allFields dbFields codeInput = do
-    let prompt = generateTransformFuncPrompt (getField @"document_data" codeInput) (module_name codeInput) (concat $ inputs codeInput) (output codeInput)
-    writeFile "testprompt" prompt
-    !genResponse <- transformsRequest prompt (concat $ inputs codeInput)
+
+funcReaskPipeline :: FuncReaskInput -> IO CodeOutput
+funcReaskPipeline fri@FuncReaskInput{..} = do 
+    !genResponse <- transformsRequest convHistory 
 
     case genResponse of 
         Left (statusCode, statusMessage) -> 
@@ -36,3 +48,21 @@ generateTransformFunctions allFields dbFields codeInput = do
             throwIO $ ErrorResponse statusCode statusMessage
         Right genFunction -> do 
             cf <- compareASTForFuns allFields dbFields codeInput genFunction
+            case cf of 
+                Left err -> return $ CodeOutput err [] 0.0 0.0 HM.empty
+                Right co@CodeOutput{..} -> do
+                    if retryCount - 1 == 0 
+                        then return co
+                        else do
+                            let cH = convHistory ++ [Message "assistant" code, Message "user" $ intercalate ", " hallucinated_functions]
+                            funcReaskPipeline fri{convHistory=cH, retryCount=retryCount-1} 
+
+
+
+generateTransformFunctions :: HM.HashMap String [String] -> HM.HashMap String [String] -> CodeInput -> IO CodeOutput
+generateTransformFunctions allFields dbFields codeInput = do
+    let prompt = generateTransformFuncPrompt (getField @"document_data" codeInput) (module_name codeInput) (concat $ inputs codeInput) (output codeInput)
+    writeFile "testprompt" prompt
+    let promptMsg = ragMessages (concat $ inputs codeInput) ++ [Message "user" prompt]
+    
+    funcReaskPipeline $ FuncReaskInput 3 promptMsg allFields dbFields codeInput

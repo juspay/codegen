@@ -49,9 +49,9 @@ formatDocument prompt = do
     Right codeInput -> pure $ FormatedDocData codeInput
     Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
 
-transformsRequest :: String -> String -> IO (Either (Int,String) String)
-transformsRequest prompt inputType = do
-    let promptMsg = (ragMessages inputType) ++ [Message "user" prompt]
+transformsRequest :: [Message ] -> IO (Either (Int,String) String)
+transformsRequest promptMsg = do
+    let 
         url = baseURL ++ "openai/deployments/" ++ deploymentForTrans ++ deploymentType ++ "?api-version=" ++ apiVersion
         headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
     requestGPT promptMsg url headers

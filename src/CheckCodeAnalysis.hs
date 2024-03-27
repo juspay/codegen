@@ -26,7 +26,7 @@ accDetails = HM.fromList [] -- [("accountdetails",["onepayMerchantId","onepayMer
 fewMappings =
     [""]
 
-compareASTForFuns :: (HM.HashMap String [String]) -> (HM.HashMap String [String]) -> CodeInput -> String -> IO (Either CodeOutput String)
+compareASTForFuns :: (HM.HashMap String [String]) -> (HM.HashMap String [String]) -> CodeInput -> String -> IO (Either String CodeOutput)
 compareASTForFuns allFields dbFields codeInput genCode = do
     codegenDir <- getEnv "CODEGEN_DIR"
     emoduleAST <- try $ moduleParser codegenDir "Response"
@@ -62,57 +62,11 @@ compareASTForFuns allFields dbFields codeInput genCode = do
                                                                             else foldl (\acc (typeName,fields) -> if y `elem` fields then acc ++ [typeName] else acc) [] getFilteredFromAllDBFields
                                                     in ((x ++ "." ++ y),expectedFields)) allNotRelatedFields
             writeFile "AllFuns" (show pats)
-            return $ Left $ CodeOutput genCode halucinatedFuns halucinatedFunScore halucinatedTypeScore mapAllRelatedFields
+            return $ Right $ CodeOutput genCode halucinatedFuns halucinatedFunScore halucinatedTypeScore mapAllRelatedFields
         Left (e :: SomeException) ->
-            return $ CodeOutput ("Couldnt parse the below code, so metrics are not generated\n" <> genCode) [] 0.0 0.0 HM.empty
+            return $ Left $ "Couldnt parse the below code, so metrics are not generated\n" <> genCode
 
 
--- compareASTForFuns :: (HM.HashMap String [String]) -> (HM.HashMap String [String]) -> CodeInput -> IO CodeOutput
--- compareASTForFuns allFields dbFields codeInput = do
---     let prompt = generatePrompt (getField @"document_data" codeInput) (module_name codeInput) (concat $ inputs codeInput) (output codeInput)
---     writeFile "testprompt" prompt
---     !changedInput <- transformsRequest prompt (concat $ inputs codeInput)
---     -- let allSubFiles = Unused.getAllSubFils ""  []
---     case changedInput of
---         Right genCode -> do
---             codegenDir <- getEnv "CODEGEN_DIR"
---             emoduleAST <- try $ moduleParser codegenDir "Response"
---             case emoduleAST of
---               Right moduleAST -> do
---                 allFuns <- Fl.getModFunctionList moduleAST "Sample"
---                 let requestType = (inputs codeInput) !! 0
---                 let pats = mapMaybe getAllDot (moduleAST ^? biplateRef)
---                     allDotOps = nub $ (snd <$> pats) ++ (fst <$> pats)
---                 print allDotOps
---                 let filteredFuns = nub $ map (\(x,list) -> (x, filter (\(_,name) -> not $ name `elem` allDotOps ) list)) (allFuns :: [(String,[(String,String)])])
---                     allFunsInvolved = nub $ filter (\(x,y) -> not $ x == "") (concat $ snd <$> allFuns)
---                     getAllLocalFuns = nub $ filter (\(x,y) -> "Euler.API.Gateway" `isInfixOf` x) (concat $ snd <$> allFuns)
---                 srcDir <- getEnv "SRC_DIR"
---                 filesToParseAST <- mapM (\x -> do
---                                     emod <- try $ moduleParser srcDir x
---                                     case emod of
---                                         Right mod -> pure (Just mod,x)
---                                         Left (e :: SomeException) -> pure (Nothing,x)) $ nub $ fst <$> getAllLocalFuns
---                 allLocalFunList <- mapM (\(maybeMod,x) -> maybe (pure []) (\mod -> Fl.getModFunctionList mod x) maybeMod) filesToParseAST
---                 let onlyFuns = (((fst <$> (concat allLocalFunList))))
---                     totalFuns = length allFunsInvolved
---                     halucinatedFuns = filter (\x -> not $ x `elem` onlyFuns) (nub $ snd <$> getAllLocalFuns)
---                     halucinatedFunScore = ((int2Float $ length halucinatedFuns) / int2Float totalFuns ) * 100
---                     allNotRelatedFields = filter (\(x,y) -> not $ case HM.lookup ( if x == "request" then requestType else toLower <$> x) (allFields <> accDetails) of
---                                                             Just val -> y `elem` val
---                                                             Nothing -> False) pats
---                 let halucinatedTypeScore = ((int2Float $ length allNotRelatedFields) / int2Float (length pats) ) * 100
---                 let toBeFound = snd <$> allNotRelatedFields
---                     getFilteredFromAllFields = filter (\(x,y) -> any (\val -> val `elem` y) toBeFound ) $ HM.toList allFields
---                     getFilteredFromAllDBFields = filter (\(x,y) -> any (\val -> val `elem` y) toBeFound ) $ HM.toList dbFields
---                     mapAllRelatedFields = HM.fromList $ map (\(x,y) -> let expectedFields = if x == "request" then foldl (\acc (typeName,fields) -> if y `elem` fields then acc ++ [typeName] else acc) [] getFilteredFromAllFields
---                                                                                 else foldl (\acc (typeName,fields) -> if y `elem` fields then acc ++ [typeName] else acc) [] getFilteredFromAllDBFields
---                                                         in ((x ++ "." ++ y),expectedFields)) allNotRelatedFields
---                 writeFile "AllFuns" (show pats)
---                 pure $ CodeOutput genCode halucinatedFuns halucinatedFunScore halucinatedTypeScore mapAllRelatedFields
---               Left (e :: SomeException) ->
---                 pure $ CodeOutput ("Couldnt parse the below code, so metrics are not generated\n" <> genCode) [] 0.0 0.0 HM.empty
---         Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
 
 getAllDot :: Ann UExpr (Dom GhcPs) SrcTemplateStage -> Maybe (String,String)
 getAllDot expr@(Ann _ (UInfixApp (Ann _ (UVar (Ann _ (UNormalName (Ann _ (UQualifiedName (AnnListG _ names) (Ann _ (UNamePart left)))))))) (Ann _ (UNormalOp (Ann _ (UQualifiedName _ (Ann _ (UNamePart ".")))))) (Ann _ (UVar (Ann _ (UNormalName (Ann _ (UQualifiedName  (AnnListG _ name) (Ann _ (UNamePart right)))))))))) = if null names && null name then Just $ (left, right) else Nothing
