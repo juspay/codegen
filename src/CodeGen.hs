@@ -25,8 +25,9 @@ generateTransformFuncPrompt docData modName inputs outputs =
   ++ "\nINPUT TYPE:" ++ inputs ++ "\nOUTPUT TYPE:" ++ outputs
 
 reaskHallucinatedFuncsPrompt halucinatedFuns = 
-    "Following imported functions are not available in codebase: " ++ halucinatedFuns
-    ++ "\n Can you generate function with it's functionality and add it to previously generated code?"
+    "Following functions are not available in above generated code : " ++ halucinatedFuns
+    ++ "\n can you generate this function by using hoogle functions and don’t expect it to be present in other files. Use above code and user message for its functionality.\n"
+    ++ "Add generated code in above code block and return everything"
 
 
 data FuncReaskInput = FuncReaskInput{
@@ -34,13 +35,14 @@ data FuncReaskInput = FuncReaskInput{
     convHistory :: [Message],
     allFields :: (HM.HashMap String (String,[String])), 
     dbFields :: (HM.HashMap String (String,[String])),
-    codeInput :: CodeInput
+    codeInput :: CodeInput,
+    dpmtTypes :: DeploymentTypes
 }
 
 
 funcReaskPipeline :: FuncReaskInput -> IO CodeOutput
 funcReaskPipeline fri@FuncReaskInput{..} = do 
-    !genResponse <- transformsRequest convHistory 
+    !genResponse <- transformsRequest dpmtTypes convHistory 
 
     case genResponse of 
         Left (statusCode, statusMessage) -> 
@@ -55,7 +57,7 @@ funcReaskPipeline fri@FuncReaskInput{..} = do
                         then return co
                         else do
                             let cH = convHistory ++ [Message "assistant" code, Message "user" $ intercalate ", " hallucinated_functions]
-                            funcReaskPipeline fri{convHistory=cH, retryCount=retryCount-1} 
+                            funcReaskPipeline fri{convHistory=cH, retryCount=retryCount-1, dpmtTypes=GENIUS} 
 
 
 
@@ -65,4 +67,4 @@ generateTransformFunctions allFields dbFields codeInput = do
     writeFile "testprompt" prompt
     let promptMsg = ragMessages (concat $ inputs codeInput) ++ [Message "user" prompt]
     
-    funcReaskPipeline $ FuncReaskInput 3 promptMsg allFields dbFields codeInput
+    funcReaskPipeline $ FuncReaskInput 3 promptMsg allFields dbFields codeInput PGLLM

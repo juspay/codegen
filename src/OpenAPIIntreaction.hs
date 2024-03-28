@@ -15,6 +15,8 @@ import Network.HTTP.Types.Status (statusCode,statusMessage , ok200)
 import Examples
 import Types 
 import EnvVars (oaiReqTimeoutSecs)
+import Network.HTTP.Types (HeaderName)
+import Data.ByteString.Char8 (ByteString)
 
 generatePrompt docData modName inputs outputs =
   "Generate a Haskell code to transform data into the API request body using the provided information. Utilize Haskell types if mentioned below. If no request body is specified, skip generating the transformation function. Do not create Haskell data types for request and response bodies; assume they already exist.\nDESCRIPTION:" ++ docData ++ (maybe "\n" (\x -> "\nMODULE_NAME:" ++ x) modName) ++ "\nINPUT TYPE:" ++ inputs ++ "\nOUTPUT TYPE:" ++ outputs
@@ -28,6 +30,26 @@ apiVersion = ""
 deploymentType = ""
 apiKey = ""
 gptapikey = ""
+
+
+geniusBaseURL = ""
+geniusDeployment = ""
+geniusApiVersion = ""
+geniusDeploymentType = ""
+geniusApiKey = ""
+
+
+
+generateBaseURL :: DeploymentTypes -> (String, [(HeaderName, ByteString)])
+generateBaseURL GENIUS = do 
+  let url = geniusBaseURL ++ "openai/deployments/" ++ geniusDeployment ++ geniusDeploymentType ++ "?api-version=" ++ geniusApiVersion
+  let headers = [("Content-Type", "application/json"), ("api-key", pack geniusApiKey)]
+  (url, headers)
+generateBaseURL PGLLM = do 
+  let url = baseGPTUrl ++ "openai/deployments/" ++ deploymentForTypes ++ deploymentType ++ "?api-version=" ++ apiVersion
+  let headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
+  (url, headers)
+
 
 typesRequest :: DocData -> IO (FormatedDocData)
 typesRequest prompt = do
@@ -49,11 +71,9 @@ formatDocument prompt = do
     Right codeInput -> pure $ FormatedDocData codeInput
     Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
 
-transformsRequest :: [Message ] -> IO (Either (Int,String) String)
-transformsRequest promptMsg = do
-    let 
-        url = baseURL ++ "openai/deployments/" ++ deploymentForTrans ++ deploymentType ++ "?api-version=" ++ apiVersion
-        headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
+transformsRequest :: DeploymentTypes -> [Message] -> IO (Either (Int,String) String)
+transformsRequest dpmtTypes promptMsg = do
+    let (url, headers) = generateBaseURL dpmtTypes
     requestGPT promptMsg url headers
 
 getTimeoutInMicroSec :: String  -> Int 
