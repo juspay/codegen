@@ -8,6 +8,8 @@ import GHC.Generics
 import qualified Data.HashMap.Strict as HM
 import Control.Exception
 
+data DeploymentTypes = GENIUS | PGLLM
+
 data DocumentData = DocumentData
   { documentContents :: String
   }

@@ -21,6 +21,7 @@ import OpenAPIIntreaction
 import Control.Monad.IO.Class
 import GenerateFlow
 import Azure (createDeployment, deleteDeployment)
+import CodeGen (generateTransformFunctions)
 
 
 type MyApi = "uploadDoc" :> ReqBody '[JSON] DocumentData :> Post '[JSON] DocumentSplitData
@@ -84,4 +85,4 @@ getTypes repoPath cond = do
 
 generateTransformFuns codeInput (gatewayTypes,dbTypes) = do
     print codeInput
-    compareASTForFuns gatewayTypes dbTypes codeInput
+    generateTransformFunctions gatewayTypes dbTypes codeInput
