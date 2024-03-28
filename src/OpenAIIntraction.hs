@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, DeriveGeneric, DuplicateRecordFields, TypeApplications, DataKinds #-}
 
-module OpenAPIIntreaction where
+module OpenAIIntraction where
 
 import Network.HTTP.Client
 import Network.HTTP.Client (Manager(..))
@@ -19,6 +19,9 @@ import EnvVars (oaiReqTimeoutSecs)
 generatePrompt docData modName inputs outputs =
   "Generate a Haskell code to transform data into the API request body using the provided information. Utilize Haskell types if mentioned below. If no request body is specified, skip generating the transformation function. Do not create Haskell data types for request and response bodies; assume they already exist.\nDESCRIPTION:" ++ docData ++ (maybe "\n" (\x -> "\nMODULE_NAME:" ++ x) modName) ++ "\nINPUT TYPE:" ++ inputs ++ "\nOUTPUT TYPE:" ++ outputs
 
+generatePromptForRoutes docData gatewayRequestType gatewatResponseType =
+  "Generate Types for this data\n" ++ docData ++ "\nGateway Request Type : " ++ gatewayRequestType ++ "\nGateway Response Type : " ++ gatewatResponseType
+
 
 baseURL = ""
 baseGPTUrl = ""
@@ -34,7 +37,7 @@ typesRequest prompt = do
   let url = baseURL ++ "openai/deployments/" ++ deploymentForTrans ++ deploymentType ++ "?api-version=" ++ apiVersion
       headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
       promptMsg = typeSample ++ [Message "user" (getField @"document_data" prompt)]
-  gptoutput <- requestGPT promptMsg url headers
+  gptoutput <- requestGPT 0.01 promptMsg url headers
   case gptoutput of
     Right codeInput -> pure $ FormatedDocData codeInput
     Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
@@ -44,30 +47,40 @@ formatDocument prompt = do
   let url = baseGPTUrl ++ "openai/deployments/" ++ deploymentForTypes ++ deploymentType ++ "?api-version=" ++ apiVersion
       headers = [("Content-Type", "application/json"), ("api-key", pack gptapikey)]
       promptMsg = [Message "user" ("Convert the following document data in csv format considering next line will be new field\n" <> (getField @"document_data" prompt))]
-  gptoutput <- requestGPT promptMsg url headers
+  gptoutput <- requestGPT 0.01 promptMsg url headers
   case gptoutput of
     Right codeInput -> pure $ FormatedDocData codeInput
     Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
 
-transformsRequest :: String -> String -> IO (Either (Int,String) String)
-transformsRequest prompt inputType = do
+transformsRequest :: Double -> String -> String -> IO (Either (Int,String) String)
+transformsRequest temp prompt inputType = do
     let promptMsg = (ragMessages inputType) ++ [Message "user" prompt]
         url = baseURL ++ "openai/deployments/" ++ deploymentForTrans ++ deploymentType ++ "?api-version=" ++ apiVersion
         headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
-    requestGPT promptMsg url headers
+    requestGPT temp promptMsg url headers
+
+routesRequest :: RoutesInput -> IO RoutesOutput
+routesRequest prompt = do
+  let url = baseURL ++ "openai/deployments/" ++ deploymentForTrans ++ deploymentType ++ "?api-version=" ++ apiVersion
+      headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
+      promptMsg = routesSample ++ [Message "user" (generatePromptForRoutes (getField @"documentData" prompt) (getField @"gatewayReqType" prompt) (getField @"gatewayRespType" prompt))]
+  gptoutput <- requestGPT 0.01 promptMsg url headers
+  case gptoutput of
+    Right codeInput -> pure $ RoutesOutput codeInput
+    Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
 
 getTimeoutInMicroSec :: String  -> Int 
 getTimeoutInMicroSec timeInSec = read timeInSec  * 1000000
 
 -- requestGPT :: [Message] -> IO (Either (Int,String) String)
-requestGPT promptMsg url headers = do
+requestGPT temp promptMsg url headers = do
     manager <- newManager tlsManagerSettings
     timeoutSecs <- oaiReqTimeoutSecs
     writeFile "promptmsg" (show promptMsg)
     let request_body = LLMRequestBody
           { messages = promptMsg
           , max_tokens = 1000
-          , temperature = 0.01
+          , temperature = temp
           , frequency_penalty = 0.2
           , presence_penalty = 0.5
           , top_p = 0.95
