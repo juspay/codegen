@@ -22,6 +22,7 @@ generatePrompt docData modName inputs outputs =
 generatePromptForRoutes docData gatewayRequestType gatewatResponseType =
   "Generate Types for this data\n" ++ docData ++ "\nGateway Request Type : " ++ gatewayRequestType ++ "\nGateway Response Type : " ++ gatewatResponseType
 
+generatePromptForTypes = "Generate open api spec from the data given below. Make sure to add required:True if the field is mandatory. Give examples only for static fields, that is if the value of field never change\n\n"
 
 baseURL = ""
 baseGPTUrl = ""
@@ -32,22 +33,20 @@ deploymentType = ""
 apiKey = ""
 gptapikey = ""
 
-typesRequest :: DocData -> IO (FormatedDocData)
+typesRequest :: DocData -> IO (Either (Int,String) String)
 typesRequest prompt = do
   let url = baseURL ++ "openai/deployments/" ++ deploymentForTrans ++ deploymentType ++ "?api-version=" ++ apiVersion
       headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
-      promptMsg = typeSample ++ [Message "user" (getField @"document_data" prompt)]
-  gptoutput <- requestGPT 0.01 promptMsg url headers
-  case gptoutput of
-    Right codeInput -> pure $ FormatedDocData codeInput
-    Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
+      promptMsg = typeSample ++ [Message "user" (generatePromptForTypes ++ getField @"document_data" prompt)]
+  requestGPT 0.01 promptMsg url headers "open-api.yml"
+
 
 formatDocument :: DocData -> IO (FormatedDocData)
 formatDocument prompt = do
   let url = baseGPTUrl ++ "openai/deployments/" ++ deploymentForTypes ++ deploymentType ++ "?api-version=" ++ apiVersion
       headers = [("Content-Type", "application/json"), ("api-key", pack gptapikey)]
       promptMsg = [Message "user" ("Convert the following document data in csv format considering next line will be new field\n" <> (getField @"document_data" prompt))]
-  gptoutput <- requestGPT 0.01 promptMsg url headers
+  gptoutput <- requestGPT 0.01 promptMsg url headers "txt.csv"
   case gptoutput of
     Right codeInput -> pure $ FormatedDocData codeInput
     Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
@@ -57,14 +56,14 @@ transformsRequest temp prompt inputType = do
     let promptMsg = (ragMessages inputType) ++ [Message "user" prompt]
         url = baseURL ++ "openai/deployments/" ++ deploymentForTrans ++ deploymentType ++ "?api-version=" ++ apiVersion
         headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
-    requestGPT temp promptMsg url headers
+    requestGPT temp promptMsg url headers "Response.hs"
 
 routesRequest :: RoutesInput -> IO RoutesOutput
 routesRequest prompt = do
   let url = baseURL ++ "openai/deployments/" ++ deploymentForTrans ++ deploymentType ++ "?api-version=" ++ apiVersion
       headers = [("Content-Type", "application/json"), ("api-key", pack apiKey)]
       promptMsg = routesSample ++ [Message "user" (generatePromptForRoutes (getField @"documentData" prompt) (getField @"gatewayReqType" prompt) (getField @"gatewayRespType" prompt))]
-  gptoutput <- requestGPT 0.01 promptMsg url headers
+  gptoutput <- requestGPT 0.01 promptMsg url headers "Routes.hs"
   case gptoutput of
     Right codeInput -> pure $ RoutesOutput codeInput
     Left (statusCode, statusMessage) -> throwIO $ ErrorResponse statusCode statusMessage
@@ -73,7 +72,7 @@ getTimeoutInMicroSec :: String  -> Int
 getTimeoutInMicroSec timeInSec = read timeInSec  * 1000000
 
 -- requestGPT :: [Message] -> IO (Either (Int,String) String)
-requestGPT temp promptMsg url headers = do
+requestGPT temp promptMsg url headers fileName = do
     manager <- newManager tlsManagerSettings
     timeoutSecs <- oaiReqTimeoutSecs
     writeFile "promptmsg" (show promptMsg)
@@ -105,6 +104,6 @@ requestGPT temp promptMsg url headers = do
               let resContents = (unlines $ map (\x ->
                     if "module " `isPrefixOf` x then "module Response where" else x
                     ) $ lines $ (getField @"content") $ ((message $ head $ choices (res :: ResponseBody)) :: MessageContent))
-              writeFile "Response.hs" resContents
+              writeFile fileName resContents
               return $ Right ((getField @"content") $ ((message $ head $ choices (res :: ResponseBody)) :: MessageContent))
       else return $ Left $ (statusCode $ statusCode',show $ statusMessage $ statusCode')

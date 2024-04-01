@@ -25,6 +25,7 @@ import Azure (createDeployment, deleteDeployment)
 
 import Config (temperatureRanges)
 import GHC.Records (getField)
+import GenerateTypes
 
 type MyApi = "uploadDoc" :> ReqBody '[JSON] DocumentData :> Post '[JSON] DocumentSplitData
             :<|> "gateway" :> ("integrate" :> ReqBody '[JSON] CodeInput :> Post '[JSON] CodeOutput
@@ -40,7 +41,7 @@ server :: ((HM.HashMap String (String,[String])), (HM.HashMap String (String,[St
 server allTypes = splitDoc :<|> (genTransForms :<|> genTypes :<|> genRoutes :<|> genFlow) :<|> (formatDoc) :<|> (createDep :<|> deleteDep)
   where genTransForms codeInput = liftIO $ generateTransformFuns codeInput allTypes
         formatDoc docData = liftIO $ formatDocument docData
-        genTypes docData = liftIO $ typesRequest docData
+        genTypes docData = liftIO $ generateTypesFromSpec docData
         genRoutes input = liftIO $ routesRequest input
         genFlow docData = do
             liftIO $ print docData

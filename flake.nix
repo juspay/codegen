@@ -9,6 +9,7 @@
     references.url = "github:eswar2001/references/35912f3cc72b67fa63a8d59d634401b79796469e";
     references.flake = true;
     haskell-tools.url = "github:juspay/haskell-tools/577263b05e10abcbc09d0d34dd316fc75e4dc380";
+    openapi3-code-generator.url = "github:Chaitanya-nair/Haskell-OpenAPI-Client-Code-Generator/90875689b812eac100dc00e1b6bb617c108f8578";
   };
   outputs = inputs @ {
     self,
@@ -40,12 +41,16 @@
             haskell-tools-refactor.source = inputs.haskell-tools + /src/refactor;
             haskell-tools-builtin-refactorings.source = inputs.haskell-tools + /src/builtin-refactorings;
             haskell-tools-demo.source = inputs.haskell-tools + /demo;
+            openapi3-code-generator.source = inputs.openapi3-code-generator + /openapi3-code-generator ;
           };
           settings = {
             haskell-tools-builtin-refactorings = {
               check = false;
             };
             haskell-tools-daemon = {
+              check = false;
+            };
+            openapi3-code-generator = {
               check = false;
             };
           };
